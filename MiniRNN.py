@@ -65,8 +65,8 @@ class MiniGRU(nn.Module):
         log_z = -F.softplus(-k) #value의 첫번째 인자
         log_tilde_h = Utils.log_g(self.cell_h(x)) # value의 두번째 인자.
         log_h_0 = Utils.log_g(h_0) #첫 hidden인자 로그변환
-
-        log_value = torch.cat([log_h_0, log_z*log_tilde_h], dim=1)
+        # log_value psudo_code 연산자 확인!!
+        log_value = torch.cat([log_h_0, log_z + log_tilde_h], dim=1)
 
         #병렬 스캔 연산 수행 (수치 안정성 보장 함수로 사용)
         output = Utils.parallel_scan_log(log_coeff, log_value)
@@ -100,8 +100,8 @@ class MiniLSTM(nn.Module):
 
         log_tilde_h = Utils.log_g(self.cell_h(x)) # value의 두번째 인자.
         log_h_0 = Utils.log_g(h_0) #첫 hidden인자 로그변환
-
-        log_value = torch.cat([log_h_0, log_i_prime * log_tilde_h], dim=1)
+        # log_value psudo_code 연산자 확인!!
+        log_value = torch.cat([log_h_0, log_i_prime + log_tilde_h], dim=1)
 
         #병렬 스캔 연산 수행 (수치 안정성 보장 함수로 사용)
         output = Utils.parallel_scan_log(log_f_prime, log_value)
