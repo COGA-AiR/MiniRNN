@@ -43,19 +43,22 @@ class Utils:
 # parallel mode만 구현하고 Sequence mode는 구현안함
 
 class MiniGRU(nn.Module):
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, expansion_factor=1):
         super(MiniGRU, self).__init__()
 
         self.hidden_size = hidden_size
+        self.exp = expansion_factor
 
         # miniGRU는 게이트웨이 간소화->2개만 정의함
-        self.cell_z = nn.Linear(input_size, hidden_size)
-        self.cell_h = nn.Linear(input_size, hidden_size)
+        # 추가로 논문 부록 C의 확장계수(expansion_factor)를 적용함
+        self.cell_z = nn.Linear(input_size, hidden_size*expansion_factor)
+        self.cell_h = nn.Linear(input_size, hidden_size*expansion_factor)
 
     def forward(self, x, h_0=None):
         bs, seq_len, _ = x.size() # (bs, seq_len, input_size)
         if h_0 is None: # 초기 hidden : (bs, 1, hidden_size)
-            h_0 = torch.zeros(bs, 1, self.hidden_size,
+            # 표현력 증가를 위한 확장계수를 추가함
+            h_0 = torch.zeros(bs, 1, self.hidden_size * self.exp,
                               device=x.device, dtype=x.dtype)
             
         k = self.cell_z(x) # z_t의 로그공간 연산으로 생성한 임시변수
@@ -76,20 +79,22 @@ class MiniGRU(nn.Module):
 
 
 class MiniLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, expansion_factor=1):
         super(MiniLSTM, self).__init__()
 
         self.hidden_size = hidden_size
+        self.exp = expansion_factor
 
         # miniLSTM는 게이트웨이 간소화->3개만 정의함
-        self.cell_f = nn.Linear(input_size, hidden_size)
-        self.cell_i = nn.Linear(input_size, hidden_size)
-        self.cell_h = nn.Linear(input_size, hidden_size)
+        self.cell_f = nn.Linear(input_size, hidden_size*expansion_factor)
+        self.cell_i = nn.Linear(input_size, hidden_size*expansion_factor)
+        self.cell_h = nn.Linear(input_size, hidden_size*expansion_factor)
 
     def forward(self, x, h_0=None):
         bs, seq_len, _ = x.size() # (bs, seq_len, input_size)
         if h_0 is None: # 초기 hidden : (bs, 1, hidden_size)
-            h_0 = torch.zeros(bs, 1, self.hidden_size,
+            # 표현력 증가를 위한 확장계수를 추가함
+            h_0 = torch.zeros(bs, 1, self.hidden_size * self.exp,
                               device=x.device, dtype=x.dtype)
         
         # f_prime, i_prime의 분모에 해당하는 인자의 로그변환 임시변수
@@ -107,3 +112,29 @@ class MiniLSTM(nn.Module):
         output = Utils.parallel_scan_log(log_f_prime, log_value)
 
         return output # (bs, seq_len, input_size)
+
+
+# mini_LSTM/GRU사용방법을 알리기 위한 main구문
+if __name__ == "__main__":
+    # 예제 입력 및 모델 설계를 위한 하이퍼 파라미터 정의
+    input_size = 25
+    hidden_size = 50
+    seq_len = 5
+    batch_size = 128
+
+    # Example input tensor
+    inputs = torch.randn(batch_size, seq_len, input_size)
+
+    # Initialize MiniLSTM and MiniGRU models
+    mini_LSTM = MiniLSTM(input_size, hidden_size, expansion_factor=1)
+    mini_GRU = MiniGRU(input_size, hidden_size, expansion_factor=6)
+
+    # Forward pass through the models
+    output_1 = mini_LSTM(inputs)
+    output_2 = mini_GRU(inputs)
+
+    # Print output shapes to verify the output
+    # Expected shape: (batch_size, seq_len, hidden_size * expansion_factor)
+    print(f"LSTM Output Shape: {output_1.shape}")
+    # Expected shape: (batch_size, seq_len, hidden_size * expansion_factor)
+    print(f"GRU Output Shape: {output_2.shape}")   
